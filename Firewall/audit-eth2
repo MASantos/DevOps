@@ -1,0 +1,23 @@
+#!/bin/bash
+
+AUDITDIR=/root/NOBACKUP/AUDIT
+OUTBASE="$AUDITDIR/`date +"%d%m%Y-%H%M"`"
+OUTFILE="${OUTBASE}.tcp"
+LOGFILE="${OUTBASE}.log"
+
+startAudit(){
+[ $# -gt 0 ] && IF=$1
+tcpdump -i $IF -w $OUTFILE
+}
+
+IF=eth2
+
+main(){
+startAudit $IF
+}
+
+######################################
+#
+
+main >& $LOGFILE &
+

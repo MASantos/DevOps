@@ -1,0 +1,49 @@
+#!/bin/csh
+# June 13th 2006: Added kernel logs on eth0 and input.
+# 		Default, only sshd though.
+#
+# Watch /var/log/messages for ssh login requests to localhost.
+# Argument list is used as keyword list to additional filter the output.
+# It does a logical and with each keyword
+# Miguel A. Santos HSC 2006
+
+set logf="/var/log/messages"
+
+set SECURITY="| grep \047Illegal|refused|dentification\047 " 
+
+if($#argv < 1) then
+cat /var/log/messages| grep "sshd\|helix su: (to root)"|grep "from\|helix su: (to root)" | grep "Illegal\|refused\|dentification\|helix su: (to root)"
+exit
+endif
+
+if( "$1" == "-a" ) then
+cat /var/log/messages| grep "sshd\|input:\|eth0:\|helix su: (to root)"|grep "from\|input:\|eth0:\|helix su: (to root)"
+exit
+endif
+
+set mtl=("")
+while( $#argv > 0 )
+ switch("$1")
+	case "-a":
+		cat $logf | grep "sshd\|input:\|eth0:\|helix su: (to root)"|grep "from\|input:\|eth0:\|helix su: (to root)"
+		exit
+	case "-f":
+		shift
+		set logf=$1
+		shift
+		breaksw
+	default:
+		set mtl=($1"\|"$mtl)
+		shift
+ endsw
+end
+
+set mtl=($1)
+shift
+while( $#argv > 0 )
+	set mtl=($1"\|"$mtl)
+	shift
+end
+
+cat /var/log/messages| grep "sshd\|input:\|eth0:\|helix su: (to root)"|grep "from\|input:\|eth0:\|helix su: (to root)" | grep "$mtl" 
+#cat /var/log/messages| grep sshd|grep from| grep "$mtl" 

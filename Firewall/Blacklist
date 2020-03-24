@@ -1,0 +1,77 @@
+#!/bin/bash
+
+SDIR=~/FIREWALL
+save_only=0
+
+#wdir=`pwd`
+#thisf=$0
+#location=`dirname $thisf`
+#echo $wdir $thisf $location
+#echo $wdir/$location
+
+usage(){
+cat << EOU
+Usage: `basename $0` [-h|-help|--hep] [ip|ip/net [ip|ip/net [ ... ] ]]
+       `basename $0` --save
+       `basename $0` -l | --show
+	
+	Adds list of ip's, or eventually ip-nets, to the 'BlackList' chain
+	of the 'FILTER' table of IPTABLES. 
+
+	The exact command issued for each ip/net is
+		iptables -A BlackList -j BlackListed -s ip/net
+
+	Without options or issueing -h, -help or --help shows this help
+
+	The new rules set is automatically saved in /etc/iptables as well as
+	within root's own $SDIR. Exact commands issued are
+		cp -p /etc/iptables /etc/iptables_blacklist.bkp
+		iptables-save > /etc/iptables
+		iptables-save > $SDIR/iptables_`date -Idate`_personal.bkp
+
+	Option --save just dumps iptables from memory to disk issueing those three commands.
+
+	Option -l or --show prints on stdout the list of blacklisted ip/net's 
+
+	WARNING: Programm does NOT check input !!	
+EOU
+}
+
+AddToBlackList(){
+echo "iptables -A BlackList -j BlackListed -s $1 "
+iptables -A BlackList -j BlackListed -s $1
+}
+
+SaveIpt(){
+cp -p /etc/iptables /etc/iptables_blacklist.bkp
+iptables-save > /etc/iptables
+iptables-save > $SDIR/iptables_`date -Idate`_personal.bkp
+}
+
+ListBlacklist(){
+iptables -n -L | grep BlackListed
+}
+
+[ $# -eq 0 ] && ( $0 --help ) && exit
+
+case "$1" in 
+	"-h" | "-help" | "--help" )
+					usage ; exit ;;
+	"--save" )
+			SaveIpt ; exit ;;
+	"-l" | "--show" )
+			ListBlacklist ; exit;;
+	* )
+			echo "Blacklisting..."
+			for s in $@; do AddToBlackList $s ; done
+			SaveIpt ; exit ;;
+esac
+
+#( [ $# -eq 0 ] || test "$1" == "-help" -o "$1" == "-h" -o "$1" == "--help" ) && usage && exit
+#test "$1" == "--save" && save_only=1 && SaveIpt && exit
+
+
+
+
+
+ 

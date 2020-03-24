@@ -1,0 +1,27 @@
+#!/bin/bash
+
+SLEEP=5
+
+
+if [ $# -gt 0 ] ; then
+	case $1 in
+		-h|--help) echo "$0 [seconds]" ; exit;;
+		*) SLEEP=$1 ; shift ;;
+	esac
+fi
+
+
+echo "#Monitoring established, listening connections and #open-file-descriptors (lsof|wc -l) every $SLEEP seconds"
+printf "#" ; date
+
+while  true ; do
+	e=`netstat -nte | wc -l`
+	l=`netstat -ntl | wc -l`
+	opfd=`lsof | wc -l`
+	ct="`date +"%D-%H:%M:%S"`"
+	printf "T: $ct\t"
+	printf "$e\t$l\t$opfd\n"
+	sleep $SLEEP
+done
+
+

@@ -1,0 +1,26 @@
+#!/bin/csh
+
+
+#if($#argv < 1 || $#argv > 1 ) then
+# echo "Wrong arguments"
+# exit 1
+#endif
+
+set user=$1
+if( "$user" == "" ) then
+	exit
+endif
+
+set uhome=`finger $user | grep Directory| awk '{print $2}'`
+set sshdir="${uhome}/.ssh"
+
+if( ! -d $uhome || ! -d $sshdir ) then
+	echo "User $user has no $sshdir" > /dev/stderr
+	exit
+endif
+if( -d $uhome && -d $sshdir ) then
+	chown root $sshdir
+	chmod 700 $sshdir
+	echo "Blocked ssh for user $user" > /dev/stderr
+endif
+
