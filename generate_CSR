@@ -1,0 +1,37 @@
+#!/bin/bash
+#Based on one created by Horschak
+#http://lena.franken.de/linux/create_certificate.html
+#
+SSL_DIR=/etc/ssl
+
+SERVER=wodaklab.org
+PRIVATE_KEY=${SSL_DIR}/private/$SERVER.private.key
+CERTIFICATE_FILE=${SSL_DIR}/certs/$SERVER.crt
+SIGNING_REQUEST=/root/SSL_CERTIFICATE/$SERVER.signing.request
+VALID_DAYS=365
+
+echo "Generate new pair private/public key (with des3 passwd)? [n/YES]"
+read ans
+echo "You said: $ans"
+if test "$ans" == "YES" ; then
+	[ -f $PRIVATE_KEY ] && echo "Delete old private key" && rm $PRIVATE_KEY
+	echo "Create new private/public-keys without passphrase for server"
+	openssl genrsa -des3 -out $PRIVATE_KEY 2048
+fi
+
+#Check private key
+[ -s $PRIVATE_KEY ] || { echo "`basename $0` : ERROR: Private key not found : $PRIVATE_KEY . Was it generated??" ; exit ;}
+echo "Removing old signing request file."
+[ -f $SIGNING_REQUEST ] && rm $SIGNING_REQUEST
+echo "Create file for signing request"
+openssl req -new -days $VALID_DAYS -key $PRIVATE_KEY -out $SIGNING_REQUEST
+
+echo "Filename for signing request is: $SIGNING_REQUEST"
+echo "Send the content of the file to the certification authority."
+echo "For example: Christian Heutger [c.heutger@psw.biz]"
+echo "from http://www.ssl-certs.de"
+cat $SIGNING_REQUEST
+
+echo "You can check this request at"
+echo "https://secure.comodo.net/utilities/decodeCSR.html"
+

@@ -1,0 +1,19 @@
+#!/bin/csh
+
+set tostdout=1
+set nodesl=( cn01 cn02 cn03 cn04 cn05 cn06 cn07 cn08 cn09 cn10 cn11 )
+
+foreach node ( $nodesl )
+ if( $tostdout > 0 ) then
+  echo $node
+  ssh $node "df -h" | grep -v "helix\|tmpfs"
+  echo " "
+ else
+  echo $node >> ClusterDiskUsage
+  ssh $node "df -h" | grep -v "helix\|tmpfs" >> ClusterDiskUsage
+  echo " " >> ClusterDiskUsage
+ endif
+end
+
+
+
