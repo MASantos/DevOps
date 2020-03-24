@@ -1,0 +1,183 @@
+#!/bin/bash
+# Copyright (c) Miguel A. Santos, HSC, 2008
+# msantos@sickkids.ca
+# Under GPLv3 (see http://www.gnu.org/copyleft/gpl.html )
+# Based on backup
+#
+################################## CONFIGURATION   ###########################
+
+#Leave this variable blank if you want to use default backup location for non root users.
+#This default points to a place where it's sure that user have write permissions
+# default=$HOME/BACKUP
+USERBKPDIR=
+#
+#In order to make a system backup user must be root. Then he can also write on /home/BACKUP
+#Only root will write here. Any other user will write in USERBKPDIR
+SYSTEMBKPDIR=/home/BACKUP
+#
+################################## DO NOT MODIFY BELOW THIS LINE ###########################
+#
+DEFAULTUSERBKPDIR=$HOME/BACKUP ; if test "$USERBKPDIR" == "" ; then USERBKPDIR=$DEFAULTUSERBKPDIR ; fi
+usage(){
+cat<<EOU
+Usage: `basename $0` -run [ -h | -help ]  [ -full | -incremental ] [-D BACKUP_DIR] [dir1 [ dir2 [...] ] ]
+
+	First keyword "-run" is mandatory.
+	
+	What is done depends on wether the user is root or not.
+		For normal users, it makes a backup of the home directory or just the folder specified in the command line.
+		Backup directory is $USERBKPDIR
+		If the user is root, it makes a backup of the whole system or just the folder specified in the command line. 
+		Backup directory is $SYSTEMBKPDIR
+
+	Default backup type is incremental
+
+	-help shows crontab setup
+
+	WARNING: THIS SCRIPT IS NOT USER-PROOF. NO WARRANTY WHATSOEVER THAT IT WONT DESTROY YOUR COMPUTER, YOUR HOME OR
+	EVEN YOUR PET. SO MAKE SURE YOU KNOW WHAT YOU DO, SPECIALLY IF YOU MODIFY IT.
+
+EOU
+}
+showCrontabSetUp(){
+cat<<EOT
+Add following lines to /etc/crontab (if regular user, skip keyword "root"
+#System backup task
+#       Run full backup (level 0) once a week (midnight saturday-sunday)
+0 0 * * 6 root `pwd`/`basename $0` -full
+#       Run incremental backup dayly at 18:00h
+00 18 * * * root `pwd`/`basename $0`
+EOT
+true
+}
+
+USER="`whoami`"
+#DIRSTOBACKUP=( /R1 /var / /home /tmp /usr /boot /opt )
+DIRSTOBACKUP=()
+if test "$USER" == "root" ; then 
+	BACKUPDIR=$SYSTEMBKPDIR
+else
+	BACKUPDIR=$USERBKPDIR
+fi
+LOGF=$BACKUPDIR/backup.log
+
+#LEVEL= INCREMENTAL FULL
+FULL=0
+LEVEL=0
+OVERWRITE=0
+
+[ $# -eq 0 ] && usage && exit
+case $1 in
+	-h|-help|--help) ;;
+	-run) shift
+		;;
+	*) usage && exit ;;
+esac
+
+#test ! "$1" == "-run" && test  "$1" ~= "-help" -o "$1" ~= "--help" && usage && exit
+#shift
+while [ $# -gt 0 ] ; do
+	case $1 in 
+		-h) usage && exit;;
+		-help|--help) usage && showCrontabSetUp && exit;;
+		-full|--full) shift ; FULL=1  ; OVERWRITE=1 ; echo "REQUESTED FULL BACKUP";;
+		-incremental) shift ; FULL=0 ;;
+		-D) shift ; BACKUPDIR=$1 ; shift ;;
+		*) [ ! -d $1 ] && echo "ERROR: folder $1 not found " && exit;
+		   DIRSTOBACKUP=( ${DIRSTOBACKUP[*]} $1 ) ; shift ;;
+	esac
+done
+[ ${#DIRSTOBACKUP[*]} -eq 0 ] && if test "$USER" == "root" ; then
+					DIRSTOBACKUP=( /R1 /var / /home /tmp /usr /boot /opt )
+				 else
+					DIRSTOBACKUP=( $HOME )
+				 fi
+[ ! -d $BACKUPDIR ] && echo "$0 : FATAL ERROR : BACKUP DIRECTORY $BACKUPDIR DOES NOT EXIST. QUITTING" && exit
+[ ! -s $BACKUPDIR/`basename $0` ] && cp -p $0 $BACKUPDIR
+
+TAROPTS="zpPc"
+
+DoSystemBackUp(){
+echo "---------------------------"
+echo "$0 : Start : `date`"
+for d in ${DIRSTOBACKUP[*]} ; do
+	zsize=`du -sh $d | awk '{print substr($1,1,1)}'`
+	[ $zsize -eq 0 ] && continue
+	if test "$d" == "/" ; then
+		BASED="SYSROOT"
+	else
+		BASED=`basename $d`
+	fi
+	BKPBASE=${BACKUPDIR}/${BASED}
+	#snarf="${BKPBASE}.${FULL}.snar"
+	#MYDATE=`date +"%Y_%h_%d-%H_%M"`
+	snarf="${BKPBASE}.0.snar"
+	if [ $FULL -eq 1 ] ; then
+		[ -f $snarf ] && rm ${BKPBASE}*.snar
+		if [ `ls ${BKPBASE}.*.tar.gz 2>/dev/null | wc -l` -gt 0 ] ; then
+			echo "Removing old backups..."
+			rm ${BKPBASE}.*.tar.gz 
+		fi
+		LEVEL=0
+	else
+		if [ -s $snarf ] ; then
+			LEVEL=`ls ${BKPBASE}.*.tar.gz | sort -r | head -1 | sed 's@.*\.\([0-9]*\)\.tar.gz@\1@g'`
+			LEVEL=$(( $LEVEL + 1 ))
+			#LEVEL=`echo $LEVEL | awk '{print 1+$1}'`
+		else
+			LEVEL=0
+			snarf="${BKPBASE}.0.snar"
+		fi 
+	fi
+	BKPF=${BKPBASE}.${LEVEL}.tar.gz
+	[ -f $BKPF ] && [ $OVERWRITE -eq 0 ] && echo "$0 : WARNING: Backup file $BKPF exists. SKipping!" && continue
+	[ -f .${BKPF}.saved ] && rm $BKPF
+	[ -f .${BKPF}.saved ] && rm .${BKPF}.saved
+	#SPECIFIC TAR OPTS
+	EXCDL=()
+	EXTRAOPT=""
+	case $BASED in 
+		SYSROOT)
+			EXTRAOPT="--one-file-system"
+			;;
+		R1)
+			;;
+		var)
+			EXCDL=( /var/run )
+			;;
+		home)
+			EXCDL=( $BACKUPDIR )
+			;;
+		tmp)	
+			;;
+		usr)
+			;;
+		boot)
+			;;
+		opt)
+			;;
+	esac
+	EXCLUDEOPT=()
+	if [ ${#EXCDL[*]} -gt 0 ] ; then
+		for xd in ${EXCDL[*]} ; do
+			EXCLUDEOPT=(${EXCLUDEOPT[*]} --exclude=$xd/'*' )
+		done
+	fi
+	date
+	echo "tar -$TAROPTS -f $BKPF -g $snarf ${EXCLUDEOPT[*]} $EXTRAOPT $d"
+	#echo 1 > $BKPF 
+	#echo 1 > $snarf
+	tar -$TAROPTS -f $BKPF -g $snarf ${EXCLUDEOPT[*]}  $EXTRAOPT $d
+done
+echo "$0 : Done : `date`"
+echo "---------------------------"
+}
+
+DoSystemBackUp >> $LOGF
+
+exit
+###################################
+#time tar -jcf   /home/BACKUP/R1.0.tar.gz -p -P --exclude=/R1/certs/ /R1
+#time tar -zpPcf /home/BACKUP/var.0.tar.gz  -g /home/BACKUP/var.0.snar  --exclude='/var/run/*' /var
+
+

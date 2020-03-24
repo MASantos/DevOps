@@ -1,0 +1,142 @@
+#!/bin/bash
+# Copyright (c) Miguel A. Santos, HSC, 2008
+# msantos@sickkids.ca
+# Under GPLv3 (see http://www.gnu.org/copyleft/gpl.html )
+#
+
+usage(){
+cat<<EOU
+Usage: `basename $0` [ -h | -help ]  [ -full | -incremental ] [-D BACKUP_DIR] [dir1 [ dir2 [...] ] ]
+	
+	Makes a backup of the whole system or just the folder specified in the command line.
+	Backup directory is $BACKUPDIR
+	
+	Default is incremental
+
+	-help shows crontab setup
+EOU
+}
+showCrontabSetUp(){
+cat<<EOT
+Add following lines to /etc/crontab
+#System backup task
+#       Run full backup (level 0) once a week (midnight saturday-sunday)
+0 0 * * 6 root /root/backup -full
+#       Run incremental backup dayly at 18:00h
+00 18 * * * root /root/BACKUPS/backup
+EOT
+true
+}
+
+#DIRSTOBACKUP=( /R1 /var / /home /tmp /usr /boot /opt )
+DIRSTOBACKUP=()
+BACKUPDIR=/home/BACKUP
+LOGF=$BACKUPDIR/backup.log
+
+#LEVEL= INCREMENTAL FULL
+FULL=0
+LEVEL=0
+OVERWRITE=0
+
+while [ $# -gt 0 ] ; do
+	case $1 in 
+		-h) usage && exit;;
+		-help|--help) usage && showCrontabSetUp && exit;;
+		-full|--full) shift ; FULL=1  ; OVERWRITE=1 ; echo "REQUESTED FULL BACKUP";;
+		-incremental) shift ; FULL=0 ;;
+		-D) shift ; BACKUPDIR=$1 ; shift ;;
+		*) [ ! -d $1 ] && echo "ERROR: folder $1 not found " && exit;
+		   DIRSTOBACKUP=( ${DIRSTOBACKUP[*]} $1 ) ; shift ;;
+	esac
+done
+[ ${#DIRSTOBACKUP[*]} -eq 0 ] && DIRSTOBACKUP=( /R1 /var / /home /tmp /usr /boot /opt )
+
+[ ! -d $BACKUPDIR ] && echo "$0 : FATAL ERROR : BACKUP DIRECTORY $BACKUPDIR DOES NOT EXIST. QUITTING" && exit
+[ ! -s $BACKUPDIR/`basename $0` ] && cp -p $0 $BACKUPDIR
+
+TAROPTS="zpPc"
+
+DoSystemBackUp(){
+echo "---------------------------"
+echo "$0 : Start : `date`"
+for d in ${DIRSTOBACKUP[*]} ; do
+	zsize=`du -sh $d | awk '{print substr($1,1,1)}'`
+	[ $zsize -eq 0 ] && continue
+	if test "$d" == "/" ; then
+		BASED="SYSROOT"
+	else
+		BASED=`basename $d`
+	fi
+	BKPBASE=${BACKUPDIR}/${BASED}
+	#snarf="${BKPBASE}.${FULL}.snar"
+	#MYDATE=`date +"%Y_%h_%d-%H_%M"`
+	snarf="${BKPBASE}.0.snar"
+	if [ $FULL -eq 1 ] ; then
+		[ -f $snarf ] && rm ${BKPBASE}*.snar
+		if [ `ls ${BKPBASE}.*.tar.gz 2>/dev/null | wc -l` -gt 0 ] ; then
+			echo "Removing old backups..."
+			rm ${BKPBASE}.*.tar.gz 
+		fi
+		LEVEL=0
+	else
+		if [ -s $snarf ] ; then
+			LEVEL=`ls ${BKPBASE}.*.tar.gz | sort -r | head -1 | sed 's@.*\.\([0-9]*\)\.tar.gz@\1@g'`
+			LEVEL=$(( $LEVEL + 1 ))
+			#LEVEL=`echo $LEVEL | awk '{print 1+$1}'`
+		else
+			LEVEL=0
+			snarf="${BKPBASE}.0.snar"
+		fi 
+	fi
+	BKPF=${BKPBASE}.${LEVEL}.tar.gz
+	[ -f $BKPF ] && [ $OVERWRITE -eq 0 ] && echo "$0 : WARNING: Backup file $BKPF exists. SKipping!" && continue
+	[ -f .${BKPF}.saved ] && rm $BKPF
+	[ -f .${BKPF}.saved ] && rm .${BKPF}.saved
+	#SPECIFIC TAR OPTS
+	EXCDL=()
+	EXTRAOPT=""
+	case $BASED in 
+		SYSROOT)
+			EXTRAOPT="--one-file-system"
+			;;
+		R1)
+			;;
+		var)
+			EXCDL=( /var/run )
+			;;
+		home)
+			EXCDL=( /home/BACKUP )
+			;;
+		tmp)	
+			;;
+		usr)
+			;;
+		boot)
+			;;
+		opt)
+			;;
+	esac
+	EXCLUDEOPT=()
+	if [ ${#EXCDL[*]} -gt 0 ] ; then
+		for xd in ${EXCDL[*]} ; do
+			EXCLUDEOPT=(${EXCLUDEOPT[*]} --exclude=$xd/'*' )
+		done
+	fi
+	date
+	echo "tar -$TAROPTS -f $BKPF -g $snarf ${EXCLUDEOPT[*]} $EXTRAOPT $d"
+	#echo 1 > $BKPF 
+	#echo 1 > $snarf
+	tar -$TAROPTS -f $BKPF -g $snarf ${EXCLUDEOPT[*]}  $EXTRAOPT $d
+done
+echo "$0 : Done : `date`"
+echo "---------------------------"
+}
+
+DoSystemBackUp >> $LOGF
+
+exit
+###################################
+#time tar -jcf   /home/BACKUP/R1.0.tar.gz -p -P --exclude=/R1/certs/ /R1
+#time tar -zpPcf /home/BACKUP/var.0.tar.gz  -g /home/BACKUP/var.0.snar  --exclude='/var/run/*' /var
+
+
