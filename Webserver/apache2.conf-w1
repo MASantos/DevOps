@@ -1,0 +1,419 @@
+#
+# PidFile: The file in which the server should record its process
+# identification number when it starts.
+#
+PidFile /var/run/apache2.pid
+
+#
+# Timeout: The number of seconds before receives and sends time out.
+#
+TimeOut 300
+
+#
+# KeepAlive: Whether or not to allow persistent connections (more than
+# one request per connection). Set to "Off" to deactivate.
+#
+KeepAlive on
+
+#
+# MaxKeepAliveRequests: The maximum number of requests to allow
+# during a persistent connection. Set to 0 to allow an unlimited amount.
+# We recommend you leave this number high, for maximum performance.
+#
+MaxKeepAliveRequests 100
+
+#
+# KeepAliveTimeout: Number of seconds to wait for the next request from the
+# same client on the same connection.
+#
+KeepAliveTimeout 15
+
+##
+## Server-Pool Size Regulation (MPM specific)
+## 
+
+# prefork MPM
+# StartServers: number of server processes to start
+# MinSpareServers: minimum number of server processes which are kept spare
+# MaxSpareServers: maximum number of server processes which are kept spare
+# MaxClients: maximum number of server processes allowed to start
+# MaxRequestsPerChild: maximum number of requests a server process serves
+<IfModule mpm_prefork_module>
+    StartServers          5
+    MinSpareServers       5
+    MaxSpareServers      10
+    MaxClients          150
+    MaxRequestsPerChild   0
+</IfModule>
+
+# worker MPM
+# StartServers: initial number of server processes to start
+# MaxClients: maximum number of simultaneous client connections
+# MinSpareThreads: minimum number of worker threads which are kept spare
+# MaxSpareThreads: maximum number of worker threads which are kept spare
+# ThreadsPerChild: constant number of worker threads in each server process
+# MaxRequestsPerChild: maximum number of requests a server process serves
+<IfModule mpm_worker_module>
+    StartServers          2
+    MaxClients          150
+    MinSpareThreads      25
+    MaxSpareThreads      75 
+    ThreadsPerChild      25
+    MaxRequestsPerChild   0
+</IfModule>
+
+User www-data
+Group www-data
+
+#
+# AccessFileName: The name of the file to look for in each directory
+# for additional configuration directives.  See also the AllowOverride
+# directive.
+#
+
+AccessFileName .htaccess
+
+#
+# The following lines prevent .htaccess and .htpasswd files from being 
+# viewed by Web clients. 
+#
+<Files ~ "^\.ht">
+    Order allow,deny
+    Deny from all
+</Files>
+
+#
+# DefaultType is the default MIME type the server will use for a document
+# if it cannot otherwise determine one, such as from filename extensions.
+# If your server contains mostly text or HTML documents, "text/plain" is
+# a good value.  If most of your content is binary, such as applications
+# or images, you may want to use "application/octet-stream" instead to
+# keep browsers from trying to display binary files as though they are
+# text.
+#
+DefaultType text/plain
+
+
+#
+# HostnameLookups: Log the names of clients or just their IP addresses
+# e.g., www.apache.org (on) or 204.62.129.132 (off).
+# The default is off because it'd be overall better for the net if people
+# had to knowingly turn this feature on, since enabling it means that
+# each client request will result in AT LEAST one lookup request to the
+# nameserver.
+#
+HostnameLookups Off
+
+# ErrorLog: The location of the error log file.
+# If you do not specify an ErrorLog directive within a <VirtualHost>
+# container, error messages relating to that virtual host will be
+# logged here.  If you *do* define an error logfile for a <VirtualHost>
+# container, that host's errors will be logged there and not here.
+#
+ErrorLog /var/log/apache2/error.log
+
+#
+# LogLevel: Control the number of messages logged to the error_log.
+# Possible values include: debug, info, notice, warn, error, crit,
+# alert, emerg.
+#
+LogLevel warn
+
+# Include module configuration:
+Include /etc/apache2/mods-enabled/*.load
+Include /etc/apache2/mods-enabled/*.conf
+
+# Include all the user configurations:
+Include /etc/apache2/httpd.conf
+
+# Include ports listing
+Include /etc/apache2/ports.conf
+
+#
+# The following directives define some format nicknames for use with
+# a CustomLog directive (see below).
+#
+LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+LogFormat "%h %l %u %t \"%r\" %>s %b" common
+LogFormat "%{Referer}i -> %U" referer
+LogFormat "%{User-agent}i" agent
+
+#
+# ServerTokens
+# This directive configures what you return as the Server HTTP response
+# Header. The default is 'Full' which sends information about the OS-Type
+# and compiled in modules.
+# Set to one of:  Full | OS | Minor | Minimal | Major | Prod
+# where Full conveys the most information, and Prod the least.
+#
+ServerTokens ProductOnly
+
+#
+# Optionally add a line containing the server version and virtual host
+# name to server-generated pages (internal error documents, FTP directory 
+# listings, mod_status and mod_info output etc., but not CGI generated 
+# documents or custom error documents).
+# Set to "EMail" to also include a mailto: link to the ServerAdmin.
+# Set to one of:  On | Off | EMail
+#
+ServerSignature Off
+
+TraceEnable off
+
+# Include generic snippets of statements
+Include /etc/apache2/conf.d/
+
+# Include the virtual host configurations:
+# Include /etc/apache2/sites-enabled/
+
+# <Proxy> block example. Make sure ProxyRequests Off is set. 
+# Since this is a reverse proxy set up, access control is less important.
+# http://httpd.apache.org/docs/2.2/mod/mod_proxy.html#access
+
+# DEFAULT SERVER NAME
+ServerName wodaklab.org
+
+Options -Indexes
+
+ProxyRequests Off
+ProxyPreserveHost On 
+
+
+<Proxy *>
+Order allow,deny
+Allow from all
+</Proxy>
+
+# DEFAULT ROOT
+DocumentRoot /var/www
+
+<IfModule apreq_module>
+    AddHandler sedna-handler .xqy .xquery
+</IfModule>
+
+
+# DEFAULT LOG DEFS
+CustomLog /var/log/apache2/access.log "combined"
+ErrorLog /var/log/apache2/error.log
+LogLevel warn
+LogFormat "combined"
+
+####### PORT 80 #################
+NameVirtualHost *:80
+
+<VirtualHost *:80>
+
+
+    # SERVER NAME
+    ServerName wodaklab.org
+
+  <LocationMatch "^.*/searchable/index.*$">
+        AuthType Basic
+        AuthName WodakAuth
+        AuthUserFile /etc/wwwWodakUser
+        
+        Require valid-user
+    </LocationMatch>
+
+    alias /cytoscapeEventAnnotations /R1/resources/tools/cytoscapeEventAnnotations/trunk/target/site
+
+    Alias /wiki /R1/resources/wodak_wiki/mediawiki
+
+    # LAB WEBSITE
+    ProxyPass /ws http://localhost:8031/ws
+    ProxyPassReverse /ws http://localhost:8031/ws
+
+    # VIEW VC PUBLIC
+    ScriptAlias /viewvc "/R1/resources/viewvc/publicViewvc/bin/cgi/viewvc.cgi"
+
+    # iRefWEB
+    ProxyPass /iRefWeb http://localhost:8041/iRefWeb
+    ProxyPassReverse /iRefWeb http://localhost:8041/iRefWeb
+
+ 
+
+    # iRefPrivate
+    ProxyPass /iRefPrivate http://localhost:8061/iRefPrivate
+    ProxyPassReverse /iRefPrivate http://localhost:8061/iRefPrivate
+
+    # CYC2008
+    ProxyPass /cyc2008 http://localhost:8031/cyc2008
+    ProxyPassReverse /cyc2008 http://localhost:8031/cyc2008
+
+    # GENEPRO
+    ProxyPass /genepro http://localhost:8031/genepro
+    ProxyPassReverse /genepro http://localhost:8031/genepro
+
+    # PAX ADAPTOR
+    Alias /tools/paxAdaptorPlugin "/R1/resources/tools/paxAdaptorPlugin/target/site"  
+
+    # IPROWEB
+    Alias /iProWeb "/R1/resources/tools/iProWeb/trunk/WebContent"
+
+    # PATHWAY DATA for paxadaptor
+    Alias /pathways "/R1/resources/pathways"
+
+    # MAVEN / ARTIFACTORY
+   # ProxyPass /artifactory http://localhost:8099/artifactory
+  # ProxyPassReverse /artifactory http://localhost:8099/artifcatory
+
+    # LCD
+    ProxyPass /biclustering http://localhost:8031/biclustering
+    ProxyPassReverse /biclustering http://localhost:8031/biclustering
+
+ # xwiki
+    ProxyPass /wiki http://localhost:8031/wiki
+    ProxyPassReverse /wiki http://localhost:8031/wiki
+    
+    # CM
+    ProxyPass /crm http://localhost:8041/crm
+    ProxyPassReverse /crm http://localhost:8041/crm
+
+
+    # CIHR XWIKI
+    ProxyPass /xwiki http://localhost:8071/xwiki
+    ProxyPassReverse /xwiki http://localhost:8071/xwiki
+   
+
+    # LOG DEFS
+    CustomLog /var/log/apache2/apps_access.log "combined"
+    ErrorLog /var/log/apache2/apps_error.log
+    LogLevel warn
+    LogFormat "combined"
+</VirtualHost>
+
+####### cytoscape.wodaklab.org PORT 80 ##############
+<VirtualHost *:80>
+    ServerName cytoscape.wodaklab.org
+    ServerAlias *.wodaklab.org
+
+    ProxyPreserveHost On 
+ 
+
+    ProxyPass /nexus/ http://localhost:8021/nexus/
+   ProxyPassReverse /nexus/ http://localhost:8021/nexus/
+
+    ProxyPass /hudson/ http://localhost:8021/hudson/
+    ProxyPassReverse /hudson/ http://localhost:8021/hudson/
+
+ ProxyPass /sonar http://localhost:8021/sonar
+    ProxyPassReverse /sonar http://localhost:8021/sonar
+
+    ProxyPass /cytoweb http://localhost:8021/cytoweb
+    ProxyPassReverse /cytoweb http://localhost:8021/cytoweb
+ 
+    # docs
+    Alias /javadoc "/R1/resources/artifactory/cyto_doc/output/site/apidocs" 
+   
+    CustomLog /var/log/apache2/cyto_access.log "combined"
+    ErrorLog /var/log/apache2/cyto_error.log
+    LogLevel warn
+    LogFormat "combined"
+</VirtualHost>
+
+###### SSL ##########################################
+NameVirtualHost *:443
+
+<VirtualHost _default_:443>
+
+    # LOG DEFS
+    CustomLog /var/log/apache2/svn.log "%t %u %{SVN-ACTION}e" env=SVN-ACTION
+    CustomLog /var/log/apache2/ssl_access.log "combined"
+    ErrorLog /var/log/apache2/ssl_error.log
+    LogLevel warn
+    LogFormat "combined"
+
+
+    SSLEngine on
+
+    SSLCertificateKeyFile /etc/ssl/private/wodaklab.org.private.key
+    SSLCertificateFile /etc/ssl/certs/self/wodaklab.org.self.crt
+    #SSLCertificateChainFile /etc/ssl/certs/godaddy/gd_intermediate_bundle.crt
+    #SSLCertificateFile /etc/ssl/certs/godaddy/wodaklab.org.crt
+    #SSLCertificateChainFile /etc/ssl/certs/godaddy/gd_intermediate_bundle.crt
+    SetEnvIf User-Agent .*MSIE.* nokeepalive ssl-unclean-shutdown
+    SSLVerifyClient none
+
+    SSLProxyEngine on
+
+
+
+    Alias /favicon.ico "/var/www/secure/favicon.ico"
+
+    # INTERNAL VIEW VC
+    ScriptAlias /internal/viewvc "/R1/resources/viewvc/install/bin/cgi/viewvc.cgi"
+
+    Alias /internal/calendar /R1/resources/internalLabWebSite/calendar.html
+
+    # INTERNAL LAB CALENDAR
+    <Location /internal>
+        AuthType Basic
+        AuthName WodakAuth
+        AuthUserFile /etc/wwwWodakUser
+        
+        Require valid-user
+    </Location>
+
+    # SVN: INCUBATOR
+    <Location /svn/incubator >
+        DAV svn
+        SVNPath /R1/svn_root/incubator
+        SVNPathAuthz off 
+       
+        AuthType Basic
+        AuthName WodakAuth
+        AuthUserFile /etc/wwwWodakUser
+
+        Require valid-user
+    </Location>
+
+    # SVN: SCRATCH
+    <Location /svn/scratch >
+        DAV svn
+        SVNPath /R1/svn_root/scratch
+        SVNPathAuthz off 
+       
+        AuthType Basic
+        AuthName WodakAuth
+        AuthUserFile /etc/wwwWodakUser
+
+        Require valid-user
+    </Location>
+
+   
+    # SVN: PUBLIC
+    <Location /svn/public>
+        DAV svn
+        SVNPath /R1/svn_root/public
+        SVNPathAuthz off 
+
+        AuthType Basic
+        AuthName WodakPublicAuth
+        AuthUserFile /etc/wwwWodakUser
+
+        # For any operations other than these, require an authenticated user.
+        <LimitExcept GET PROPFIND OPTIONS REPORT>
+            Require valid-user
+        </LimitExcept>
+    </Location>
+
+ # SVN: OTHER
+    <Location /svn/other >
+        DAV svn
+        SVNPath /R1/svn_root/other
+        SVNPathAuthz off 
+       
+        AuthType Basic
+        AuthName WodakAuth
+        AuthUserFile /etc/wwwWodakUser
+
+        Require valid-user
+    </Location>
+
+
+</VirtualHost>
+
+# Listen 8081
+# NameVirtualHost *:8081
+
+

@@ -1,0 +1,3 @@
+!/bin/bash
+openssl genrsa -des3 -out wodaklab.org.key 1024
+openssl req -new -key wodaklab.org.key -out wodaklab.org.csr

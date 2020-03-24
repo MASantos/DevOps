@@ -1,0 +1,12 @@
+#First kill all instances of apache and/or java involving apache
+apache2ctl start
+
+#Then run 
+/R1/webserConfig/resources start
+#This should start 3 web processes: cyc2008 (genepro, etc.), labserver and cihr2008
+#But nexus will not start because of a bug in that script. 
+#STart nexus manually
+/R1/webserConfig/resources start
+./bin/jsw/linux-x86-32/nexus start
+
+
